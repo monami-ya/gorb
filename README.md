@@ -1,4 +1,4 @@
-## GORB [![Build Status](https://travis-ci.org/kobolog/gorb.svg?branch=master)](https://travis-ci.org/kobolog/gorb) [![codecov.io](https://codecov.io/github/kobolog/gorb/coverage.svg?branch=master)](https://codecov.io/github/kobolog/gorb?branch=master)
+## GORB (Patched by Monami-ya LLC, Japan) [![Build Status](https://travis-ci.org/monami-ya/gorb.svg?branch=monami)](https://travis-ci.org/monami-ya/gorb) [![codecov.io](https://codecov.io/github/monami-ya/gorb/coverage.svg?branch=monami)](https://codecov.io/github/monami-ya/gorb?branch=monami)
 **Go Routing and Balancing**
 
 This daemon is an IPVS frontend with a REST API interface. You can use it to control local IPVS instance in the Kernel to dynamically register virtual services and backends. It also supports basic TCP and HTTP health checks (called Gorb Pulse).
