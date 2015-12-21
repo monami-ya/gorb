@@ -13,6 +13,8 @@ install:
   - go get github.com/sirupsen/logrus
   - go get github.com/tehnerd/gnl2go
   - go get github.com/fsouza/go-dockerclient
+  - go get github.com/kobolog/gorb/core
+  - go get github.com/kobolog/gorb/util
 
 script:
   - ./.travis/script.sh . core disco pulse util gorb-docker-link
