@@ -22,8 +22,11 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"net"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/kobolog/gorb/core"
 	"github.com/kobolog/gorb/util"
@@ -39,6 +42,29 @@ var (
 	listen = flag.String("l", ":4672", "endpoint to listen for HTTP requests")
 	consul = flag.String("c", "", "URL for Consul HTTP API")
 )
+
+func ping() {
+	time.Sleep(2 * time.Second)
+
+	log.Info("Start multicasting packet to Gorb-links.");
+
+	addr, err := net.ResolveUDPAddr("udp", "224.0.0.1" + *listen)
+	if err != nil {
+		log.Errorf("Error in parse UDPAddr.")
+		return
+	}
+	conn, err := net.DialUDP("udp", nil, addr)
+	if err != nil {
+		log.Errorf(fmt.Sprintf("Error in DialUDP(): %s", err))
+		return
+	}
+	_, err = conn.Write([]byte("ping!"))
+	if err != nil {
+		log.Errorf(fmt.Sprintf("Error in sending ping packet: %s", err))
+	} else {
+		log.Info("Ping multicast packet was sent.")
+	}
+}
 
 func main() {
 	// Called first to interrupt bootstrap and display usage if the user passed -h.
@@ -80,6 +106,10 @@ func main() {
 	r.Handle("/service/{vsID}/{rsID}", backendRemoveHandler{ctx}).Methods("DELETE")
 	r.Handle("/service/{vsID}", serviceStatusHandler{ctx}).Methods("GET")
 	r.Handle("/service/{vsID}/{rsID}", backendStatusHandler{ctx}).Methods("GET")
+
+	if (*consul == "") {
+		go ping()
+	}
 
 	log.Infof("setting up HTTP server on %s", *listen)
 	log.Fatal(http.ListenAndServe(*listen, r))

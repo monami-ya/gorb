@@ -51,6 +51,9 @@ var (
 
 	// Caches information about already exposed virtual services.
 	exposed = make(map[string]struct{})
+
+	// Request sending currentall status.
+	sendAllStatusChannel = make(chan string)
 )
 
 func roundtrip(rqst *http.Request, eh map[int]func() error) error {
@@ -210,6 +213,60 @@ func invokeFunc(vs, rs string, ports []gdc.APIPort, fn portAction) []error {
 	return e
 }
 
+func sendAllStatus(c *gdc.Client) {
+	for true {
+		msg := <- sendAllStatusChannel
+		r, err := c.ListContainers(gdc.ListContainersOptions{})
+		if err != nil {
+			log.Fatalf("error while listing containers: %s", err)
+		}
+
+		if len(r) != 0 {
+			log.Info(msg)
+
+			e := []error{}
+
+			for _, o := range r {
+				e = append(e, invokeFunc(o.Image, o.Names[0], o.Ports, createBackend)...)
+			}
+
+			if len(e) != 0 {
+				log.Warnf("errors while exposing existing containers: %s", e)
+			}
+		} else {
+			log.Info("There is no container.");
+		}
+	}
+}
+
+func listenPing() {
+	addrStr := "224.0.0.1:" + strings.Split(*remote, ":")[1]
+	addr, err := net.ResolveUDPAddr("udp", addrStr)
+	if err != nil {
+		log.Errorf("Can't resolve UDP address: %s", addrStr)
+		return
+	}
+	remoteAddr, err := net.ResolveUDPAddr("udp", *remote)
+
+	l, err := net.ListenMulticastUDP("udp", nil, addr)
+	maxDatagramSize := 10
+	l.SetReadBuffer(maxDatagramSize)
+
+	log.Info("Waiting ping request from the remote.")
+	for {
+		b := make([]byte, maxDatagramSize)
+		_, src, err := l.ReadFromUDP(b)
+		if err != nil {
+			log.Errorf("ReadFromUDP failed: %s", err)
+		}
+		if (src.IP.Equal(remoteAddr.IP)) {
+			sendAllStatusChannel <- "Received ping request from remote."
+		} else {
+			log.Infof("Received ping but not from remote. %d.%d.%d.%d", src.IP[0], src.IP[1], src.IP[2], src.IP[3]);
+		}
+	}
+}
+
 func main() {
 	// Called first to interrupt bootstrap and display usage if the user passed -h.
 	flag.Parse()
@@ -239,24 +296,9 @@ func main() {
 
 	log.Infof("listening on event feed at %s", c.Endpoint())
 
-	r, err := c.ListContainers(gdc.ListContainersOptions{})
-	if err != nil {
-		log.Fatalf("error while listing containers: %s", err)
-	}
-
-	if len(r) != 0 {
-		log.Infof("bootstrapping with existing containers")
-
-		e := []error{}
-
-		for _, o := range r {
-			e = append(e, invokeFunc(o.Image, o.Names[0], o.Ports, createBackend)...)
-		}
-
-		if len(e) != 0 {
-			log.Warnf("errors while exposing existing containers: %s", e)
-		}
-	}
+	go sendAllStatus(c)
+	sendAllStatusChannel <- "bootstrapping with existing containers"
+	go listenPing()
 
 	l := make(chan *gdc.APIEvents)
 	defer close(l)
